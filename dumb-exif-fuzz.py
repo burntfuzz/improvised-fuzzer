@@ -2,6 +2,7 @@
 
 import sys
 import random
+import os
 from subprocess import Popen, PIPE
 
 FLIP_RATIO = 0.01
@@ -18,10 +19,21 @@ MAGIC_VALS = [
   [0xFF, 0xFF, 0xFF, 0x7F], # 0x7FFFFFFF
 ]
 
-# read bytes from our valid JPEG and return them in a mutable bytearray 
+# Read bytes from a JPEG and return them in a mutable bytearray 
 def get_bytes(filename):
 	f = open(filename, "rb").read()
 	return bytearray(f)
+
+# Reads a file or directory of files and returns a list of bytearrays to represent the corpus
+def get_corpus(path):
+	corpus = []
+	if os.path.isfile(path):
+		corpus.append(get_bytes(path))
+	elif os.path.isdir(path):
+		for file in os.listdir(path):
+			if os.path.isfile(file):
+				corpus.append(get_bytes(file))
+	return corpus
 
 def create_new(data):
 	f = open("mutated.jpg", "wb+")
@@ -68,14 +80,17 @@ def exif(data):
 			f.write(data)
 
 if len(sys.argv) < 2:
-	print("[+] Usage: dumbfuzz.py <valid_jpg>")
+	print("[+] Usage: dumb-exif-fuzz.py <Valid JPG or directory of JPGs>")
 	exit()
 	
 filename = sys.argv[1]
 
 count = 0
+corpus = get_corpus(filename)
+#print(corpus)
 while count < 1000:
 	data = get_bytes(filename)
+	#data = random.choice(corpus)
 	mutated_data = mutate(data)
 	create_new(mutated_data)
 	exif(mutated_data)
