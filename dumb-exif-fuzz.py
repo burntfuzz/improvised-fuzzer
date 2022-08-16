@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import argparse
+import base64
+import os
 import sys
 import random
-import os
 from subprocess import Popen, PIPE
 
 FLIP_RATIO = 0.01
@@ -72,30 +74,40 @@ def mutate(data):
 	
 	return data
 	
-def exif(data):
+def exif(data, count):
 	p = Popen(["exif", "mutated.jpg", "-verbose"], stdout=PIPE, stderr=PIPE)
 	stdout, stderr = p.communicate()
 	if p.returncode == -11:
 		with open(f"crashes/crash_{count}.jpg", "wb+") as f:
 			f.write(data)
 
-if len(sys.argv) < 2:
-	print("[+] Usage: dumb-exif-fuzz.py <Valid JPG or directory of JPGs>")
-	exit()
+def main():
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-c', '--corpus', help="Target JPEG or directory containing target JPEGs", required=True)
+	parser.add_argument('-r', '--rounds', help="Number of rounds to run", default=500)
+	parser.add_argument('-s', '--seed', help="PRNG seed")
+	args = parser.parse_args()
+	corpus = get_corpus(args.corpus)
 	
-filename = sys.argv[1]
+	if args.seed:
+		start_seed = base64.b64decode(args.seed)
+	else:
+		start_seed = os.urandom(24)
+		
+	random.seed(start_seed)
+	print("Starting new run with seed {}".format(base64.b64encode(start_seed).decode('utf-8')))	
+		
+	for file in corpus:
+		count = 0
+		while count < args.rounds:
+			data = file[:]
+			mutated_data = mutate(data)
+			create_new(mutated_data)
+			exif(mutated_data, count)
+			count += 1
 
-count = 0
-corpus = get_corpus(filename)
-#print(corpus)
-while count < 1000:
-	data = get_bytes(filename)
-	#data = random.choice(corpus)
-	mutated_data = mutate(data)
-	create_new(mutated_data)
-	exif(mutated_data)
-	count += 1
-
+if __name__ == "__main__":
+    main()
 
 
 
