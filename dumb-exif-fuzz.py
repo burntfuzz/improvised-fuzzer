@@ -3,8 +3,8 @@
 import argparse
 import base64
 import os
-import sys
 import random
+import sys
 from subprocess import Popen, PIPE
 
 FLIP_RATIO = 0.01
@@ -22,12 +22,12 @@ MAGIC_VALS = [
 ]
 
 # Read bytes from a JPEG and return them in a mutable bytearray 
-def get_bytes(filename):
+def get_bytes(filename: str) -> bytearray:
 	f = open(filename, "rb").read()
 	return bytearray(f)
 
 # Reads a file or directory of files and returns a list of bytearrays to represent the corpus
-def get_corpus(path):
+def get_corpus(path: str) -> list[bytearray]:
 	corpus = []
 	if os.path.isfile(path):
 		corpus.append(get_bytes(path))
@@ -37,27 +37,32 @@ def get_corpus(path):
 				corpus.append(get_bytes(file))
 	return corpus
 
-def create_new(data):
+# Writes new data to mutation file
+def create_new(data: bytearray) -> None:
 	f = open("mutated.jpg", "wb+")
 	f.write(data)
 	f.close()
 
-def flip_bit(byte):
+# Takes a bit and flips it
+def flip_bit(byte: bytes) -> bytes:
 	return byte ^ random.choice([1, 2, 4, 8, 16, 32, 64, 128])
 
-def flip_byte(byte):
+# Takes a byte and returns a random byte
+def flip_byte(byte: bytes) -> bytes:
 	return random.getrandbits(8)
-	
-def magic(data, idx):
+
+# Takes a byte at an index and replaces it (and any neccessary following bytes) with a random magic byte	
+def magic(data: bytearray, idx: int) -> None:
 	chosen_magic = random.choice(MAGIC_VALS)
 	# TODO: Add guard clause to prevent going over/under buffer size
-	#print(f"Flipping value {data[idx]} at index {idx} to magic value: {chosen_magic}")
+	# print(f"Flipping value {data[idx]} at index {idx} to magic value: {chosen_magic}")
 	offset = 0
 	for byte in chosen_magic:
 		data[idx + offset] = byte
 		offset += 1
 
-def mutate(data):
+# Mutation function
+def mutate(data: bytearray) -> bytearray:
 	num_flips = int((len(data) - 4) * FLIP_RATIO)
 	possible_indices = range(4, len(data) - 4) # Exclude SOI and EOI markers
 	chosen_indices = random.choices(possible_indices, k=num_flips)
@@ -73,14 +78,16 @@ def mutate(data):
 			magic(data,i)
 	
 	return data
-	
-def exif(data, count):
+
+# Runs the target exif program and saves crashes
+def exif(data: bytearray, count: int) -> None:
 	p = Popen(["exif", "mutated.jpg", "-verbose"], stdout=PIPE, stderr=PIPE)
 	stdout, stderr = p.communicate()
 	if p.returncode == -11:
 		with open(f"crashes/crash_{count}.jpg", "wb+") as f:
 			f.write(data)
 
+# Fuzz loop
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-c', '--corpus', help="Target JPEG or directory containing target JPEGs", required=True)
